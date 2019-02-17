@@ -14,11 +14,14 @@ for year in range(1991,2019):
 
 salary_cap_df = pd.read_excel("Resources/SalaryCap.xlsx")
 
+#if the spreadsheets already exist, it will read them in and use this list.
 seasons_PER_list = list()
 for year in range(1991,2019):
 	df = pd.read_excel('Resources/' + str(year) + "/Team_PER_" + str(year) + ".xlsx")
 	seasons_PER_list.append(df)
 
+#when constructing new PER spreadsheets, this list will be used. When updating the spreadsheets, it will still use the old ones when running
+#analysis. Thus, run this file twice, once constructing sheets, and once analyzing. 
 new_per_list = list()
 for x in range(1,29):
 	season_dict = dict()
@@ -56,7 +59,6 @@ team_name_list.append("SAS")
 team_name_list.append("TOR")
 team_name_list.append("UTA")
 team_name_list.append("WAS")
-
 team_name_list.append("NJN")
 team_name_list.append("SEA")
 team_name_list.append("WSB")
@@ -100,7 +102,6 @@ full_team_name_list.append("San Antonio Spurs")
 full_team_name_list.append("Toronto Raptors")
 full_team_name_list.append("Utah Jazz")
 full_team_name_list.append("Washington Wizards")
-
 full_team_name_list.append("New Jersey Nets")
 full_team_name_list.append("Seattle SuperSonics")
 full_team_name_list.append("Washington Bullets")
@@ -114,33 +115,36 @@ full_team_name_list.append("New Orleans/Oklahoma City Hornets")
 
 abbr_to_names = dict(zip(team_name_list,full_team_name_list))
 
-def calculateTeamPER(teamName, year):
+#calculates any metric for any team for any year. returns a number value.
+def calculateTeamMetric(teamName, year, metric):
 	df = getOneMasterSeason(year)
 	df = df.loc[df['Tm'] == teamName]
 	if(df.empty):
 		return -1
 	cumulative = 0
 	for row in df.itertuples(index = True,name = 'Pandas'):
-		value = getattr(row,'PER')
+		value = getattr(row,metric)
 		cumulative += value
 	return cumulative
 
+#given a year, will save the values stored in the PER_list to an excel file
 def savePERtoExcel(year):
-	teamAbbrList = list(new_per_list[year-1991].keys())
-	teamPERList = list(new_per_list[year-1991].values())
-	PER_oneyear = [('Team', teamAbbrList),
+	teamAbbrList = list(new_PER_list[year-1991].keys())
+	teamMetricList = list(new_PER_list[year-1991].values())
+	metric_oneyear = [('Team', teamAbbrList),
 				('PER', teamPERList)]
-	df = pd.DataFrame.from_items(PER_oneyear)
+	df = pd.DataFrame.from_items(metric_oneyear)
 	writer = pd.ExcelWriter('Resources/' + str(year) + '/Team_PER_' + str(year) + '.xlsx')
 	df.to_excel(writer, 'Sheet1')
 	writer.save()
 
+#calculates team PER for every team from 1991-2018 and saves them into excel spreadsheets. 
 def createPERSpreadsheets():
 	for year in range(1991,2019):
 		numOfTeams = 0
-		year_dict = new_per_list[year-1991]
+		year_dict = new_PER_list[year-1991]
 		for teamAbbr in team_name_list:
-			PER = calculateTeamPER(teamAbbr,year)
+			PER = calculateTeamMetric(teamAbbr,year,"PER")
 			if (PER == -1):
 				continue
 			numOfTeams +=1
@@ -174,6 +178,15 @@ def parseRecordStrings(standings_df):
 def parseRecordString(string):
 	return string.split('-')
 
+def calculateAverageAge(short_team,predicting_year):
+	df1 = getOneMasterSeason(predicting_year-1)
+	df1 = df1.loc[df1['Tm'] == short_team]
+	age = 0
+	numPlayers = 0
+	for row in df1.itertuples(index = True, name = 'Pandas'):
+		age += getattr(row,'Age')
+		numPlayers += 1
+	return age/numPlayers
 
 def calculateContinuity(short_team,predicting_year):
 	df1 = getOneMasterSeason(predicting_year-1)
@@ -192,45 +205,54 @@ def calculateContinuity(short_team,predicting_year):
 	return minutes / totalMinutesInSeason
 
 
+#Start code
 
 
-
+#Each column is stored in a list.
 short_name_list = list()
 long_name_list = list()
 predicting_year_list = list()
 PER_list = list()
 num_wins_list = list()
 continuity_list = list()
+last_year_wins_list = list()
+avg_age_list = list()
+
 for year in range (1991,2018):
 	#sort PER's.
 	PER_df = sortSeasonPERDF(year)
-
-
+	last_year_wins_df = getOneSeasonStandings_DF(year)
 	standings_df = getOneSeasonStandings_DF(year+1)
-	#need to sort standings by PER
-		
 	count = 0
 
-
+	#loop through teams in descending order PER
 	for PER_row in PER_df.itertuples(index = True, name = 'Pandas'):
+		#find the standing row corresponding to the team using the lookup dict
 		df = standings_df.loc[standings_df['Team'] == abbr_to_names[getattr(PER_row,'Team')]]
+		last_year_df = last_year_wins_df.loc[last_year_wins_df['Team'] == abbr_to_names[getattr(PER_row,'Team')]]
 		for standings_row in df.itertuples(index = True, name = 'Pandas'):
-			
+			#get all metrics
 			short_name = getattr(PER_row, 'Team')
 			long_name = getattr(standings_row,'Team')
 			predicting_year = year+1
 			PER = str(getattr(PER_row, 'PER'))
 			record = getattr(standings_row, 'Overall')
+			for last_year_row in last_year_df.itertuples(index = True, name = 'Pandas'):
+				last_year_record = getattr(last_year_row, 'Overall')
 			num_wins = parseRecordString(record)[0]
+			last_year_num_wins = parseRecordString(last_year_record)[0]
 			continuity = calculateContinuity(short_name, predicting_year)
-
+			avg_age = calculateAverageAge(short_name,predicting_year)
+			
+			#add to lists
 			short_name_list.append(short_name)
 			long_name_list.append(long_name)
 			predicting_year_list.append(predicting_year)
 			PER_list.append(PER)
 			num_wins_list.append(num_wins)
 			continuity_list.append(continuity)
-			count +=1
+			last_year_wins_list.append(last_year_num_wins)
+			avg_age_list.append(avg_age)
 			break
 
 master = [('short_name', short_name_list),
@@ -238,10 +260,12 @@ master = [('short_name', short_name_list),
 			('predicting_year', predicting_year_list),
 			('PER', PER_list),
 			('num_wins', num_wins_list),
-			('continuity',continuity_list)]
+			('last_year_wins', last_year_wins_list),
+			('continuity',continuity_list),
+			('avg_age', avg_age_list)]
 
 master_df = pd.DataFrame.from_items(master)
-writer = pd.ExcelWriter('Master.xlsx')
+writer = pd.ExcelWriter('Master_with_age.xlsx')
 master_df.to_excel(writer, 'Sheet1')
 writer.save()
 
