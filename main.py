@@ -122,17 +122,19 @@ def calculateTeamMetric(teamName, year, metric):
 	if(df.empty):
 		return -1
 	cumulative = 0
+	numPlayers = 0
 	for row in df.itertuples(index = True,name = 'Pandas'):
 		value = getattr(row,metric)
 		cumulative += value
-	return cumulative
+		numPlayers += 1
+	return cumulative / numPlayers
 
 #given a year, will save the values stored in the PER_list to an excel file
 def savePERtoExcel(year):
-	teamAbbrList = list(new_PER_list[year-1991].keys())
-	teamMetricList = list(new_PER_list[year-1991].values())
+	teamAbbrList = list(new_per_list[year-1991].keys())
+	teamMetricList = list(new_per_list[year-1991].values())
 	metric_oneyear = [('Team', teamAbbrList),
-				('PER', teamPERList)]
+				('PER', teamMetricList)]
 	df = pd.DataFrame.from_items(metric_oneyear)
 	writer = pd.ExcelWriter('Resources/' + str(year) + '/Team_PER_' + str(year) + '.xlsx')
 	df.to_excel(writer, 'Sheet1')
@@ -142,7 +144,7 @@ def savePERtoExcel(year):
 def createPERSpreadsheets():
 	for year in range(1991,2019):
 		numOfTeams = 0
-		year_dict = new_PER_list[year-1991]
+		year_dict = new_per_list[year-1991]
 		for teamAbbr in team_name_list:
 			PER = calculateTeamMetric(teamAbbr,year,"PER")
 			if (PER == -1):
@@ -209,6 +211,8 @@ def calculateContinuity(short_team,predicting_year):
 
 
 #Each column is stored in a list.
+
+
 short_name_list = list()
 long_name_list = list()
 predicting_year_list = list()
